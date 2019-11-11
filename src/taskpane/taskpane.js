@@ -26,7 +26,7 @@ Office.onReady(info => {
     document.getElementById("create-line-chart").onclick = createChart;
     document.getElementById("get-chart-data").onclick = getChart;
     document.getElementById("recreate-chart").onclick = recreateChart;
-
+    document.getElementById("compare-chart").onclick = compareCharts
     
   }
 });
@@ -150,7 +150,7 @@ async function createChart() {
   }
 }
 
-async function getChart() {
+async function getChart(e, chartIndex) {
   /**
    * Point to the chart
    * compare the properties of the chart
@@ -162,13 +162,15 @@ async function getChart() {
     // var sheet = context.workbook.worksheets.getItem("Sheet1" /* sheet name */);
     /* number of  charts in the sheet */
     sheet.tables.load("items");
-    var chart = sheet.charts.getItemAt(0 /* index of chart, starting from 0 */);
+    var chart = sheet.charts.getItemAt(chartIndex ? chartIndex: 0 /* index of chart, starting from 0 */);
     var allPropsOfChart = `axes, axis, categoryLabelLevel, chartType, context, dataLabels, format, height, id, left, legend, name, pivotOptions, plotBy, plotArea, seriesNameLevel, showAllFieldButtons, series, style, title, top, width, worksheet`;
 
     chart.load(allPropsOfChart);
-    chart.axes.categoryAxis.title.load("text");
-    chart.title.load("text,position");
-    chart.legend.format.fill.load("color");
+    // chart.axes.categoryAxis.title.load('text,position');
+    // chart.axes.valueAxis.title.load('text,position');
+    // chart.axes.seriesAxis.title.load('text,position');
+    chart.title.load("text,position");  
+    chart.legend.format.load('border,font,fill');
     chart.dataLabels.format.font.load("size,color");
     let dataInChart = [];
     var seriesCollection = chart.series;
@@ -179,7 +181,7 @@ async function getChart() {
       for (var i = 0; i < seriesCollection.items.length; i++) {
         var collectionName = seriesCollection.getItemAt(i);
         collectionName.load("points");
-        console.log("dimensions");
+        console.log("Chart Data");
         var categories = collectionName.getDimensionValues("Categories");
         await context.sync().then(()=>{
           dataInChart[i] = [];
@@ -193,23 +195,12 @@ async function getChart() {
       chartData = dataInChart;
       console.log(dataInChart);
       chartObj = chart.toJSON();
+      console.log("Chart Obj");
       console.log(chart.toJSON())
+      return chartObj;
     });
   }).catch(e => errorHandlerFunction(e));
 }
-
-// function loadAllProps (chartObj){
-//   if(chartObj && chartObj.constructor.name !== 'Array' && typeof(chartObj) === 'object'){
-//     var chartProptotype = Object.getPrototypeOf(chartObj);
-//     var chartProps = Object.getOwnPropertyNames(chartProptotype);
-//     console.log(chartProps);
-//     chartProps.forEach(prop =>{
-//       loadAllProps(chartObj[prop]);
-//       chartObj.load(prop);
-//     });
-//     return;
-//   }else return;
-// }
 
 async function recreateChart(){
 
@@ -231,20 +222,21 @@ async function recreateChart(){
         var dataRange = sheet.tables.getItem(tableName).getRange();
   
         /**Create a line chart */
-        var chart = sheet.charts.add("Line", dataRange, "auto");
+        var chart = sheet.charts.add(chartObj.chartType, dataRange, "auto");
   
         /** Chart format options */
 
         // chart.plotArea.set(chartObj);
-        chart.title.text = "Sales Data";
-        chart.legend.position = "right";
-        chart.legend.format.fill.setSolidColor("white");
-        chart.dataLabels.format.font.size = 15;
-        chart.dataLabels.format.font.color = "black";
+        chart.title.text = chartObj.title.text ? chartObj.title.text : '';
+        chart.legend.visible = chartObj.legend.visible;
+        chart.legend.position = chartObj.legend.position;
+        chart.axes.categoryAxis.title.text = chartObj.axes.categoryAxis ? chartObj.axes.categoryAxis.title.text:"";
+        chart.axes.valueAxis.title.text = chartObj.axes.valueAxis ? chartObj.axes.valueAxis.title.text : "";
+        chart.dataLabels.format.font.size = chartObj.dataLabels.format.font.size ? chartObj.dataLabels.format.font.size : '';
+        chart.dataLabels.format.font.color = chartObj.dataLabels.format.font.size ? chartObj.dataLabels.format.font.size : '';
   
         /** Position can be mapped to the graded cells. */ 
-        chart.setPosition("D12", "I20");
-  
+        chart.setPosition("D12", "H22");
         /** Sync all of the changes to Online Excel */ 
         await context.sync();
   
@@ -259,6 +251,21 @@ async function recreateChart(){
     } catch (err) {
       console.log(err);
   }
+}
+
+async function compareCharts(){
+  Excel.run(async context => {
+  var sheet = context.workbook.worksheets.getActiveWorksheet();
+    // var sheet = context.workbook.worksheets.getItem("Sheet1" /* sheet name */);
+    /* number of  charts in the sheet */
+    sheet.charts.load("items");
+    var chart1 = sheet.charts.getItemAt(0);
+    var chart2 = sheet.charts.getItemAt(1);
+    var chart1Data = await getChart(chart1);
+    var chart2Data = await getChart(chart2);
+    console.log( "chart1Data == chart2Data" + chart1Data === chart2Data );
+    return context.sync();
+  });
 }
 
 
